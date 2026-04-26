@@ -1,0 +1,49 @@
+{
+  "version": 1,
+  "exportedAt": "2026-04-26T20:00:00.000Z",
+  "locations": [
+    {
+      "id": "home",
+      "name": "HOME",
+      "lat": 40.616,
+      "lon": -74.071,
+      "role": "primary"
+    },
+    {
+      "id": "ferry-si",
+      "name": "ST. GEORGE",
+      "lat": 40.6437,
+      "lon": -74.0726,
+      "role": "secondary"
+    },
+    {
+      "id": "ferry-ny",
+      "name": "WHITEHALL",
+      "lat": 40.7019,
+      "lon": -74.0136,
+      "role": "secondary"
+    },
+    {
+      "id": "office",
+      "name": "OFFICE",
+      "lat": 40.7505,
+      "lon": -73.9879,
+      "role": "secondary"
+    },
+    {
+      "id": "gym",
+      "name": "GYM",
+      "lat": 40.744,
+      "lon": -74.0021,
+      "role": "secondary"
+    },
+    {
+      "id": "fdr",
+      "name": "FDR",
+      "lat": 40.7335,
+      "lon": -73.9745,
+      "role": "secondary"
+    }
+  ],
+  "log": []
+}

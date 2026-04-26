@@ -1,0 +1,1587 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+<title>WETCHECK / bicycle conditions</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo+Narrow:wght@400;500;600;700&family=JetBrains+Mono:wght@300;400;500;600;700&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
+<style>
+  /* ============================================================
+     WETCHECK — instrument panel for NYC cycling
+     ============================================================ */
+  :root {
+    /* Paper-on-asphalt palette */
+    --asphalt-0: #0c0d0a;        /* deepest black, slight warm */
+    --asphalt-1: #14150f;        /* card surface */
+    --asphalt-2: #1c1d16;        /* elevated surface */
+    --asphalt-3: #2a2b22;        /* border */
+    --asphalt-4: #3d3e32;        /* hover border */
+
+    --paper:    #f0e9d6;         /* primary text, warm cream */
+    --paper-2:  #c9c2af;         /* secondary text */
+    --paper-3:  #8a836f;         /* tertiary, labels */
+    --paper-4:  #5b5547;         /* faint */
+
+    /* Signal colors — surgical use only */
+    --moss:     #7fa650;         /* good / dry / send it */
+    --sodium:   #e8b339;         /* caution / damp */
+    --rust:     #c66b3d;         /* poor / wet */
+    --oxide:    #a23a2a;         /* bad / actively raining */
+
+    --ink:      #0c0d0a;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html, body {
+    background: var(--asphalt-0);
+    color: var(--paper);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 14px;
+    line-height: 1.5;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Subtle grain texture */
+  body::before {
+    content: '';
+    position: fixed; inset: 0;
+    background-image:
+      radial-gradient(circle at 20% 30%, rgba(240, 233, 214, 0.012) 1px, transparent 1px),
+      radial-gradient(circle at 80% 70%, rgba(240, 233, 214, 0.012) 1px, transparent 1px);
+    background-size: 3px 3px, 5px 5px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .frame {
+    position: relative;
+    z-index: 1;
+    max-width: 1280px;
+    margin: 0 auto;
+    padding: 24px 32px 80px;
+  }
+
+  /* ============================================================
+     TOP BAR
+     ============================================================ */
+  header {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    border-bottom: 1px solid var(--asphalt-3);
+    padding-bottom: 16px;
+    margin-bottom: 32px;
+  }
+
+  .logo {
+    font-family: 'Archivo Narrow', sans-serif;
+    font-weight: 700;
+    font-size: 32px;
+    letter-spacing: 0.18em;
+    color: var(--paper);
+  }
+  .logo .dot {
+    display: inline-block;
+    width: 10px; height: 10px;
+    border-radius: 50%;
+    background: var(--moss);
+    margin: 0 6px 2px 0;
+    vertical-align: middle;
+    box-shadow: 0 0 8px currentColor;
+  }
+  .logo .sub {
+    font-family: 'Instrument Serif', serif;
+    font-style: italic;
+    font-weight: 400;
+    font-size: 16px;
+    letter-spacing: 0.02em;
+    color: var(--paper-3);
+    margin-left: 8px;
+  }
+
+  .meta {
+    font-size: 11px;
+    color: var(--paper-3);
+    text-align: right;
+    letter-spacing: 0.05em;
+  }
+  .meta .now { color: var(--paper-2); font-weight: 500; }
+  .meta .stamp { display: block; font-size: 10px; opacity: 0.7; margin-top: 2px; }
+
+  /* ============================================================
+     PRIMARY VERDICT (the big one)
+     ============================================================ */
+  .primary {
+    display: grid;
+    grid-template-columns: minmax(280px, 1fr) 2fr;
+    gap: 32px;
+    border: 1px solid var(--asphalt-3);
+    background: linear-gradient(180deg, var(--asphalt-1), var(--asphalt-0));
+    padding: 32px;
+    margin-bottom: 40px;
+    position: relative;
+  }
+  .primary::before {
+    content: 'PRIMARY';
+    position: absolute;
+    top: -1px; left: 24px;
+    background: var(--asphalt-0);
+    color: var(--paper-3);
+    font-size: 10px;
+    letter-spacing: 0.2em;
+    padding: 0 8px;
+    transform: translateY(-50%);
+  }
+
+  .score-block {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .score-label {
+    font-size: 10px;
+    letter-spacing: 0.25em;
+    color: var(--paper-3);
+    margin-bottom: 8px;
+  }
+  .score {
+    font-family: 'Archivo Narrow', sans-serif;
+    font-weight: 700;
+    font-size: 144px;
+    line-height: 0.9;
+    letter-spacing: -0.04em;
+    color: var(--paper);
+    font-variant-numeric: tabular-nums;
+    text-shadow: 0 0 30px rgba(240, 233, 214, 0.05);
+  }
+  .score-suffix {
+    font-size: 14px;
+    color: var(--paper-3);
+    letter-spacing: 0.1em;
+    margin-top: 4px;
+  }
+  .score.good { color: var(--moss); }
+  .score.fair { color: var(--sodium); }
+  .score.poor { color: var(--rust); }
+  .score.bad  { color: var(--oxide); }
+
+  .verdict-block {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    border-left: 1px solid var(--asphalt-3);
+    padding-left: 32px;
+  }
+  .verdict-headline {
+    font-family: 'Archivo Narrow', sans-serif;
+    font-weight: 600;
+    font-size: 36px;
+    line-height: 1.1;
+    color: var(--paper);
+    margin-bottom: 12px;
+    letter-spacing: -0.01em;
+  }
+  .verdict-headline .accent {
+    font-family: 'Instrument Serif', serif;
+    font-style: italic;
+    font-weight: 400;
+    color: var(--sodium);
+  }
+  .verdict-body {
+    font-family: 'Instrument Serif', serif;
+    font-size: 18px;
+    color: var(--paper-2);
+    line-height: 1.5;
+    max-width: 60ch;
+  }
+
+  /* Telemetry strip below primary */
+  .telemetry {
+    grid-column: 1 / -1;
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    gap: 1px;
+    background: var(--asphalt-3);
+    margin: 32px -32px -32px -32px;
+    border-top: 1px solid var(--asphalt-3);
+  }
+  .tel-cell {
+    background: var(--asphalt-1);
+    padding: 16px 20px;
+  }
+  .tel-label {
+    font-size: 9px;
+    letter-spacing: 0.2em;
+    color: var(--paper-3);
+    margin-bottom: 6px;
+  }
+  .tel-value {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 18px;
+    font-weight: 500;
+    color: var(--paper);
+    font-variant-numeric: tabular-nums;
+  }
+  .tel-value .unit {
+    font-size: 11px;
+    color: var(--paper-3);
+    margin-left: 4px;
+    font-weight: 400;
+  }
+
+  /* ============================================================
+     SECTION HEADERS
+     ============================================================ */
+  .section-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    margin-bottom: 16px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--asphalt-3);
+  }
+  .section-title {
+    font-family: 'Archivo Narrow', sans-serif;
+    font-weight: 600;
+    font-size: 18px;
+    letter-spacing: 0.15em;
+    color: var(--paper);
+  }
+  .section-sub {
+    font-size: 11px;
+    color: var(--paper-3);
+    letter-spacing: 0.05em;
+  }
+
+  /* ============================================================
+     LOCATION CARDS
+     ============================================================ */
+  .locations {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: 12px;
+    margin-bottom: 48px;
+  }
+
+  .loc-card {
+    border: 1px solid var(--asphalt-3);
+    background: var(--asphalt-1);
+    padding: 16px;
+    transition: border-color 0.2s, transform 0.15s;
+    cursor: pointer;
+    position: relative;
+    overflow: hidden;
+  }
+  .loc-card:hover {
+    border-color: var(--asphalt-4);
+    transform: translateY(-1px);
+  }
+  .loc-card.primary-loc {
+    border-color: var(--paper-4);
+  }
+  .loc-card .strip {
+    position: absolute;
+    top: 0; left: 0; bottom: 0;
+    width: 3px;
+    background: var(--paper-4);
+  }
+  .loc-card.good .strip { background: var(--moss); }
+  .loc-card.fair .strip { background: var(--sodium); }
+  .loc-card.poor .strip { background: var(--rust); }
+  .loc-card.bad  .strip { background: var(--oxide); }
+
+  .loc-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: 12px;
+  }
+  .loc-name {
+    font-family: 'Archivo Narrow', sans-serif;
+    font-weight: 600;
+    font-size: 16px;
+    letter-spacing: 0.05em;
+    color: var(--paper);
+    text-transform: uppercase;
+  }
+  .loc-score {
+    font-family: 'Archivo Narrow', sans-serif;
+    font-weight: 700;
+    font-size: 28px;
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+  }
+  .loc-score.good { color: var(--moss); }
+  .loc-score.fair { color: var(--sodium); }
+  .loc-score.poor { color: var(--rust); }
+  .loc-score.bad  { color: var(--oxide); }
+
+  .loc-line {
+    font-size: 12px;
+    color: var(--paper-2);
+    margin-bottom: 4px;
+    font-family: 'JetBrains Mono', monospace;
+  }
+  .loc-line .lbl { color: var(--paper-3); margin-right: 6px; }
+
+  .loc-verdict {
+    font-family: 'Instrument Serif', serif;
+    font-style: italic;
+    font-size: 14px;
+    color: var(--paper-2);
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px dashed var(--asphalt-3);
+    line-height: 1.4;
+  }
+
+  .loc-actions {
+    display: flex;
+    gap: 6px;
+    margin-top: 12px;
+    opacity: 0;
+    transition: opacity 0.15s;
+  }
+  .loc-card:hover .loc-actions { opacity: 1; }
+  .loc-actions button {
+    background: transparent;
+    border: 1px solid var(--asphalt-3);
+    color: var(--paper-3);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.1em;
+    padding: 4px 8px;
+    cursor: pointer;
+  }
+  .loc-actions button:hover { color: var(--paper); border-color: var(--paper-4); }
+
+  .add-loc {
+    border: 1px dashed var(--asphalt-3);
+    background: transparent;
+    padding: 16px;
+    color: var(--paper-3);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    letter-spacing: 0.15em;
+    transition: all 0.2s;
+    min-height: 120px;
+  }
+  .add-loc:hover {
+    border-color: var(--paper-4);
+    color: var(--paper);
+    background: var(--asphalt-1);
+  }
+
+  /* ============================================================
+     COMMUTE PLANNER
+     ============================================================ */
+  .commute {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin-bottom: 48px;
+  }
+  .commute-card {
+    border: 1px solid var(--asphalt-3);
+    background: var(--asphalt-1);
+    padding: 24px;
+  }
+  .commute-time {
+    font-family: 'Archivo Narrow', sans-serif;
+    font-size: 14px;
+    letter-spacing: 0.2em;
+    color: var(--paper-3);
+    margin-bottom: 8px;
+  }
+  .commute-window {
+    font-family: 'Archivo Narrow', sans-serif;
+    font-weight: 600;
+    font-size: 24px;
+    color: var(--paper);
+    margin-bottom: 16px;
+  }
+  .commute-verdict {
+    font-family: 'Instrument Serif', serif;
+    font-size: 16px;
+    color: var(--paper-2);
+    line-height: 1.5;
+    border-top: 1px solid var(--asphalt-3);
+    padding-top: 16px;
+  }
+  .commute-score {
+    display: inline-block;
+    font-family: 'Archivo Narrow', sans-serif;
+    font-weight: 700;
+    font-size: 36px;
+    line-height: 1;
+    margin-right: 12px;
+    vertical-align: middle;
+  }
+  .commute-score.good { color: var(--moss); }
+  .commute-score.fair { color: var(--sodium); }
+  .commute-score.poor { color: var(--rust); }
+  .commute-score.bad  { color: var(--oxide); }
+
+  /* ============================================================
+     FORECAST TIMELINE
+     ============================================================ */
+  .forecast-wrap {
+    margin-bottom: 48px;
+  }
+  .forecast {
+    display: flex;
+    border: 1px solid var(--asphalt-3);
+    background: var(--asphalt-1);
+    overflow-x: auto;
+    scrollbar-width: thin;
+    scrollbar-color: var(--asphalt-3) transparent;
+  }
+  .fhour {
+    flex: 0 0 56px;
+    padding: 12px 4px 8px;
+    text-align: center;
+    border-right: 1px solid var(--asphalt-3);
+    font-size: 10px;
+    color: var(--paper-3);
+    position: relative;
+  }
+  .fhour:last-child { border-right: none; }
+  .fhour.now {
+    background: var(--asphalt-2);
+    color: var(--paper);
+  }
+  .fhour.now::before {
+    content: 'NOW';
+    position: absolute; top: 2px; left: 50%;
+    transform: translateX(-50%);
+    font-size: 8px;
+    color: var(--moss);
+    letter-spacing: 0.1em;
+  }
+  .fhour-time { font-weight: 500; margin-bottom: 6px; font-size: 11px; color: var(--paper-2); }
+  .fhour-bar {
+    height: 60px;
+    background: var(--asphalt-0);
+    position: relative;
+    margin: 4px 6px;
+    border: 1px solid var(--asphalt-3);
+  }
+  .fhour-bar-fill {
+    position: absolute;
+    bottom: 0; left: 0; right: 0;
+    background: linear-gradient(180deg, var(--rust), var(--oxide));
+    transition: height 0.3s;
+  }
+  .fhour-temp { font-size: 11px; color: var(--paper-2); margin-top: 4px; font-variant-numeric: tabular-nums; }
+  .fhour-precip { font-size: 9px; color: var(--paper-3); margin-top: 2px; font-variant-numeric: tabular-nums; }
+
+  /* ============================================================
+     MODAL
+     ============================================================ */
+  .modal-bg {
+    display: none;
+    position: fixed; inset: 0;
+    background: rgba(12, 13, 10, 0.85);
+    z-index: 100;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+  }
+  .modal-bg.show { display: flex; }
+  .modal {
+    background: var(--asphalt-1);
+    border: 1px solid var(--asphalt-4);
+    padding: 32px;
+    max-width: 520px;
+    width: 100%;
+    position: relative;
+  }
+  .modal h2 {
+    font-family: 'Archivo Narrow', sans-serif;
+    font-weight: 600;
+    font-size: 20px;
+    letter-spacing: 0.15em;
+    color: var(--paper);
+    margin-bottom: 24px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--asphalt-3);
+  }
+  .modal label {
+    display: block;
+    font-size: 10px;
+    letter-spacing: 0.2em;
+    color: var(--paper-3);
+    margin-bottom: 6px;
+    margin-top: 16px;
+  }
+  .modal input, .modal select {
+    width: 100%;
+    background: var(--asphalt-0);
+    border: 1px solid var(--asphalt-3);
+    color: var(--paper);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    padding: 10px 12px;
+    outline: none;
+  }
+  .modal input:focus, .modal select:focus {
+    border-color: var(--paper-4);
+  }
+  .modal .row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+  }
+  .modal-actions {
+    display: flex;
+    gap: 8px;
+    justify-content: flex-end;
+    margin-top: 32px;
+    padding-top: 16px;
+    border-top: 1px solid var(--asphalt-3);
+  }
+  .btn {
+    background: transparent;
+    border: 1px solid var(--asphalt-3);
+    color: var(--paper-2);
+    font-family: 'Archivo Narrow', sans-serif;
+    font-weight: 600;
+    font-size: 12px;
+    letter-spacing: 0.2em;
+    padding: 10px 20px;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .btn:hover { color: var(--paper); border-color: var(--paper-4); }
+  .btn.primary {
+    background: var(--paper);
+    color: var(--ink);
+    border-color: var(--paper);
+  }
+  .btn.primary:hover { background: var(--paper-2); border-color: var(--paper-2); }
+  .btn.danger { color: var(--oxide); border-color: var(--asphalt-3); }
+  .btn.danger:hover { color: var(--paper); border-color: var(--oxide); background: var(--oxide); }
+
+  .geo-helper {
+    font-size: 11px;
+    color: var(--paper-3);
+    margin-top: 8px;
+    font-family: 'Instrument Serif', serif;
+    font-style: italic;
+  }
+  .geo-helper a, .geo-helper span.link {
+    color: var(--sodium);
+    cursor: pointer;
+    text-decoration: underline;
+    text-decoration-style: dotted;
+  }
+
+  /* ============================================================
+     RIDE LOG
+     ============================================================ */
+  .log-wrap {
+    margin-bottom: 48px;
+  }
+  .log-list {
+    border: 1px solid var(--asphalt-3);
+    background: var(--asphalt-1);
+    max-height: 280px;
+    overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: var(--asphalt-3) transparent;
+  }
+  .log-row {
+    display: grid;
+    grid-template-columns: 110px 1fr 60px 60px;
+    gap: 16px;
+    padding: 10px 16px;
+    border-bottom: 1px solid var(--asphalt-3);
+    font-size: 12px;
+    align-items: center;
+  }
+  .log-row:last-child { border-bottom: none; }
+  .log-row .when { color: var(--paper-3); font-variant-numeric: tabular-nums; }
+  .log-row .what { color: var(--paper); }
+  .log-row .score-mini {
+    font-family: 'Archivo Narrow', sans-serif;
+    font-weight: 700;
+    font-size: 18px;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+  }
+  .log-row .score-mini.good { color: var(--moss); }
+  .log-row .score-mini.fair { color: var(--sodium); }
+  .log-row .score-mini.poor { color: var(--rust); }
+  .log-row .score-mini.bad  { color: var(--oxide); }
+  .log-row button {
+    background: transparent;
+    border: none;
+    color: var(--paper-4);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 16px;
+    cursor: pointer;
+  }
+  .log-row button:hover { color: var(--oxide); }
+
+  .log-empty {
+    text-align: center;
+    padding: 32px;
+    color: var(--paper-3);
+    font-family: 'Instrument Serif', serif;
+    font-style: italic;
+  }
+
+  .log-add {
+    display: flex;
+    gap: 8px;
+    margin-top: 12px;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+  .log-add select {
+    flex: 1;
+    min-width: 160px;
+    background: var(--asphalt-1);
+    border: 1px solid var(--asphalt-3);
+    color: var(--paper);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    padding: 8px 10px;
+  }
+  .log-add input {
+    background: var(--asphalt-1);
+    border: 1px solid var(--asphalt-3);
+    color: var(--paper);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    padding: 8px 10px;
+    width: 80px;
+  }
+
+  /* ============================================================
+     LOADING / ERROR STATES
+     ============================================================ */
+  .loading {
+    text-align: center;
+    padding: 48px;
+    color: var(--paper-3);
+    font-family: 'Instrument Serif', serif;
+    font-style: italic;
+    font-size: 16px;
+  }
+  .loading::after {
+    content: '...';
+    animation: dots 1.4s steps(4) infinite;
+  }
+  @keyframes dots {
+    0%, 25% { content: '.'; }
+    50% { content: '..'; }
+    75%, 100% { content: '...'; }
+  }
+  .error {
+    border: 1px solid var(--oxide);
+    background: rgba(162, 58, 42, 0.1);
+    color: var(--paper);
+    padding: 16px;
+    margin-bottom: 16px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+  }
+
+  /* ============================================================
+     RESPONSIVE
+     ============================================================ */
+  @media (max-width: 768px) {
+    .frame { padding: 16px 16px 60px; }
+    .logo { font-size: 24px; }
+    .logo .sub { display: block; margin-left: 0; margin-top: 2px; font-size: 13px; }
+    .primary { grid-template-columns: 1fr; padding: 24px; gap: 20px; }
+    .verdict-block { border-left: none; padding-left: 0; border-top: 1px solid var(--asphalt-3); padding-top: 20px; }
+    .score { font-size: 96px; }
+    .verdict-headline { font-size: 24px; }
+    .verdict-body { font-size: 16px; }
+    .telemetry { grid-template-columns: repeat(3, 1fr); margin: 20px -24px -24px -24px; }
+    .commute { grid-template-columns: 1fr; }
+    .log-row { grid-template-columns: 90px 1fr 50px 40px; gap: 8px; font-size: 11px; }
+  }
+
+  /* Footer */
+  footer {
+    margin-top: 64px;
+    padding-top: 24px;
+    border-top: 1px solid var(--asphalt-3);
+    color: var(--paper-4);
+    font-size: 10px;
+    letter-spacing: 0.1em;
+    line-height: 1.6;
+  }
+  footer .src { color: var(--paper-3); }
+  footer a { color: var(--sodium); text-decoration: none; }
+  footer a:hover { color: var(--paper); }
+</style>
+</head>
+<body>
+<div class="frame">
+
+  <header>
+    <div class="logo">
+      <span class="dot" id="logoDot"></span>WETCHECK<span class="sub">— bicycle conditions, NYC</span>
+    </div>
+    <div class="meta">
+      <div class="now" id="clock">--:--</div>
+      <div class="stamp" id="dateStamp">--</div>
+    </div>
+  </header>
+
+  <div id="root">
+    <div class="loading">Reading the sky</div>
+  </div>
+
+  <footer>
+    <span class="src">Data: Open-Meteo (no API key, free, ECMWF + DWD models). Drying model: empirical, calibrated to NYC asphalt. Tune the constants in <code style="color:var(--paper-3)">DRY_MODEL</code> in source if you want.</span>
+  </footer>
+</div>
+
+<!-- ============================================================
+     LOCATION MODAL
+     ============================================================ -->
+<div class="modal-bg" id="locModal">
+  <div class="modal">
+    <h2 id="modalTitle">ADD LOCATION</h2>
+    <input type="hidden" id="locId" />
+
+    <label>NAME</label>
+    <input id="locName" placeholder="HOME / OFFICE / GYM" />
+
+    <div class="row">
+      <div>
+        <label>LATITUDE</label>
+        <input id="locLat" type="number" step="0.0001" placeholder="40.7128" />
+      </div>
+      <div>
+        <label>LONGITUDE</label>
+        <input id="locLon" type="number" step="0.0001" placeholder="-74.0060" />
+      </div>
+    </div>
+    <div class="geo-helper">
+      <span class="link" id="useGeo">Use my current location</span> —
+      or paste coords from Google Maps (right-click → first line shows lat, lon)
+    </div>
+
+    <label>ROLE</label>
+    <select id="locRole">
+      <option value="primary">PRIMARY (used for top verdict)</option>
+      <option value="secondary">SECONDARY</option>
+    </select>
+
+    <div class="modal-actions">
+      <button class="btn danger" id="modalDelete" style="margin-right: auto; display:none;">DELETE</button>
+      <button class="btn" id="modalCancel">CANCEL</button>
+      <button class="btn primary" id="modalSave">SAVE</button>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ==============================================================
+   WETCHECK — single-file app
+   ==============================================================
+   Architecture:
+   1. Storage: window.storage (persistent k/v) for locations + ride log
+   2. Data: Open-Meteo forecast + historical (free, no auth, CORS-enabled)
+   3. Model: empirical drying-rate model based on rainfall, temp, humidity,
+      wind, cloud cover. Outputs 0-100 score per location.
+   4. Render: vanilla JS DOM updates, no framework
+   ============================================================== */
+
+/* --------------------------------------------------------------
+   STORAGE LAYER
+   -------------------------------------------------------------- */
+const STORE = {
+  async getLocations() {
+    try {
+      const r = await window.storage.get('wetcheck:locations');
+      return r ? JSON.parse(r.value) : null;
+    } catch { return null; }
+  },
+  async setLocations(locs) {
+    return window.storage.set('wetcheck:locations', JSON.stringify(locs));
+  },
+  async getLog() {
+    try {
+      const r = await window.storage.get('wetcheck:log');
+      return r ? JSON.parse(r.value) : [];
+    } catch { return []; }
+  },
+  async setLog(log) {
+    return window.storage.set('wetcheck:log', JSON.stringify(log.slice(0, 200)));
+  },
+};
+
+const DEFAULT_LOCATIONS = [
+  // Bay Ridge (per Benny's known location) as primary; user can edit
+  { id: 'home',   name: 'HOME',   lat: 40.6262, lon: -74.0327, role: 'primary' },
+  { id: 'office', name: 'OFFICE', lat: 40.7589, lon: -73.9851, role: 'secondary' },
+];
+
+/* --------------------------------------------------------------
+   DRYING MODEL
+   --------------------------------------------------------------
+   Goal: estimate how many hours of drying remain, given:
+     - hourly rainfall (mm) for last 24h
+     - current temp (C), humidity (%), wind (kph), cloud cover (%)
+     - whether it's currently raining
+
+   Approach (empirical, NYC-calibrated):
+     1. Find the last meaningful rainfall (>= 0.2mm in any of the
+        last N hours).
+     2. For each hour since then, accumulate "drying potential":
+            dryRate = baseRate
+                     * tempFactor(T)
+                     * windFactor(W)
+                     / (humidityFactor(H) * cloudFactor(C))
+        where baseRate = 1.0 (i.e. 1 hour of "standard" conditions
+        evaporates ~1mm of surface water).
+     3. Sum drying potential vs. accumulated rainfall mm.
+        If dryingDone < rainfall, surface is still wet.
+
+   Coefficients are tuned, not derived from first principles.
+   Edit them and observe behavior — they're explicit on purpose.
+   -------------------------------------------------------------- */
+const DRY_MODEL = {
+  // mm of rain per hour considered "trace" — ignored
+  TRACE_THRESHOLD: 0.15,
+
+  // Base evaporation: standard conditions = 20°C, 50%RH, 10kph wind, 0% clouds
+  // 1 unit of "drying potential" ≈ 1mm of surface water removed
+  BASE_RATE_PER_HOUR: 0.9,
+
+  // Painted surface multiplier — paint stays wet ~1.7x longer than asphalt
+  PAINT_MULTIPLIER: 1.7,
+
+  // Standing water thresholds
+  PUDDLE_LAST_1H_MM: 5,
+  PUDDLE_LAST_3H_MM: 15,
+
+  tempFactor(T) {
+    // Linear in temp; below freezing, no drying (in fact, water can freeze)
+    if (T <= 0) return 0.05;
+    if (T < 5)  return 0.3;
+    // normalized to 1.0 at 20°C; capped at 2.5 for very hot
+    return Math.min(2.5, 0.3 + (T - 5) / 18);
+  },
+  windFactor(W) {
+    // Wind helps drying via boundary layer disruption; sqrt-ish curve
+    return Math.min(2.5, 0.5 + Math.sqrt(Math.max(0, W)) / 3.5);
+  },
+  humidityFactor(H) {
+    // 1.0 at 50% RH; 0.4 at 20%; 2.0 at 95%
+    return Math.max(0.4, Math.min(2.5, 0.4 + (H / 50) ** 1.4));
+  },
+  cloudFactor(C) {
+    // Cloud cover blocks solar radiation. 1.0 = clear; 2.0 = full overcast
+    return 1.0 + (C / 100) * 1.0;
+  },
+
+  /* Returns hourly drying potential given met conditions. */
+  dryingRate(T, W, H, C, isDaylight) {
+    let r = this.BASE_RATE_PER_HOUR
+          * this.tempFactor(T)
+          * this.windFactor(W)
+          / (this.humidityFactor(H) * this.cloudFactor(C));
+    if (!isDaylight) r *= 0.55; // night drying is slower (no solar)
+    return Math.max(0, r);
+  },
+
+  /*  Compute current wetness state from hourly history + present state.
+      hist = array of {time:Date, rain_mm, temp, wind, humid, clouds, isDay}
+             ordered oldest -> newest, last entry = current hour.
+
+      Returns: {
+        wet: bool,
+        rainNow: bool,
+        residualWaterMm: number,    // remaining surface water
+        hoursSinceRainEnded: number | null,
+        puddleLikely: bool,
+        paintWet: bool,             // paint dries slower
+      }
+  */
+  evaluate(hist) {
+    if (!hist || !hist.length) return null;
+    const now = hist[hist.length - 1];
+    const rainNow = now.rain_mm >= this.TRACE_THRESHOLD;
+
+    // Walk history and track "pending water mm" on surface
+    let waterMm = 0;
+    let lastRainHour = -1;
+    for (let i = 0; i < hist.length; i++) {
+      const h = hist[i];
+      if (h.rain_mm >= this.TRACE_THRESHOLD) {
+        waterMm += h.rain_mm;
+        lastRainHour = i;
+      } else {
+        // dry hour — subtract drying capacity
+        const dry = this.dryingRate(h.temp, h.wind, h.humid, h.clouds, h.isDay);
+        waterMm = Math.max(0, waterMm - dry);
+      }
+    }
+
+    // Also check painted surfaces — same model but with multiplier
+    let waterMmPaint = 0;
+    for (let i = 0; i < hist.length; i++) {
+      const h = hist[i];
+      if (h.rain_mm >= this.TRACE_THRESHOLD) {
+        waterMmPaint += h.rain_mm * this.PAINT_MULTIPLIER;
+      } else {
+        const dry = this.dryingRate(h.temp, h.wind, h.humid, h.clouds, h.isDay);
+        waterMmPaint = Math.max(0, waterMmPaint - dry);
+      }
+    }
+
+    const hoursSinceRainEnded = lastRainHour >= 0
+      ? (hist.length - 1 - lastRainHour)
+      : null;
+
+    // Puddle detection
+    const last1h = hist.slice(-1).reduce((s, h) => s + h.rain_mm, 0);
+    const last3h = hist.slice(-3).reduce((s, h) => s + h.rain_mm, 0);
+    const puddleLikely = last1h >= this.PUDDLE_LAST_1H_MM
+                       || last3h >= this.PUDDLE_LAST_3H_MM;
+
+    return {
+      wet: waterMm > 0.05,
+      rainNow,
+      residualWaterMm: waterMm,
+      paintWet: waterMmPaint > 0.05,
+      hoursSinceRainEnded,
+      puddleLikely,
+      currentTemp: now.temp,
+      currentWind: now.wind,
+      currentHumid: now.humid,
+      currentClouds: now.clouds,
+    };
+  },
+
+  /* Convert evaluation to 0-100 score and verdict.
+     Score philosophy: 100 = perfect dry day. Each issue subtracts. */
+  score(state, forecast = []) {
+    let s = 100;
+    const reasons = [];
+
+    if (state.rainNow) {
+      s -= 70;
+      reasons.push('actively raining');
+    }
+    if (state.puddleLikely) {
+      s -= 25;
+      reasons.push('puddles likely on low spots');
+    }
+    if (state.wet && !state.rainNow) {
+      // Surface still drying — penalty scales with residual water
+      const penalty = Math.min(35, 8 + state.residualWaterMm * 12);
+      s -= penalty;
+      const hr = state.hoursSinceRainEnded;
+      reasons.push(`damp${hr != null ? ` (rain ended ${hr}h ago)` : ''}`);
+    } else if (state.paintWet && !state.rainNow) {
+      s -= 12;
+      reasons.push('asphalt dry but painted lanes still slick');
+    }
+
+    // Cold + wet is much worse than warm + wet
+    if (state.currentTemp < 5 && (state.wet || state.paintWet)) {
+      s -= 15;
+      reasons.push('cold + wet (ice risk near freezing)');
+    }
+    if (state.currentTemp <= 0) {
+      s -= 20;
+      reasons.push('freezing — ice risk');
+    }
+
+    // Forecast: rain in next 2-3 hours?
+    const next3hRain = forecast.slice(0, 3).reduce((sum, f) => sum + (f.rain_mm || 0), 0);
+    if (next3hRain >= 1.0 && !state.rainNow) {
+      s -= Math.min(25, 8 + next3hRain * 5);
+      reasons.push(`rain incoming (${next3hRain.toFixed(1)}mm in next 3h)`);
+    }
+
+    // High wind is annoying but not safety-critical alone
+    if (state.currentWind > 35) {
+      s -= 10;
+      reasons.push(`strong wind ${state.currentWind.toFixed(0)} kph`);
+    } else if (state.currentWind > 25) {
+      s -= 5;
+      reasons.push(`gusty ${state.currentWind.toFixed(0)} kph`);
+    }
+
+    s = Math.max(0, Math.min(100, Math.round(s)));
+
+    let band, headline, body;
+    if (state.rainNow) {
+      band = 'bad';
+      headline = 'It is raining.';
+      body = 'Active precipitation. Skip the bike unless you really have to. Visibility down, brakes degraded, painted lanes treacherous.';
+    } else if (s >= 85) {
+      band = 'good';
+      headline = 'Send it.';
+      body = 'Dry roads, decent conditions. ' + (state.hoursSinceRainEnded == null
+        ? 'No recent rain to worry about.'
+        : `Last rain ${state.hoursSinceRainEnded}h ago, fully dried out.`);
+    } else if (s >= 65) {
+      band = 'fair';
+      headline = 'Probably fine.';
+      body = capitalize(reasons.join(', ')) + '. Ride with awareness — watch painted lanes and metal grates if anything is damp.';
+    } else if (s >= 40) {
+      band = 'poor';
+      headline = 'Not great.';
+      body = capitalize(reasons.join(', ')) + '. Consider transit or wait it out if you can.';
+    } else {
+      band = 'bad';
+      headline = 'Skip it.';
+      body = capitalize(reasons.join(', ')) + '. Conditions stacked against you.';
+    }
+
+    return { score: s, band, headline, body, reasons };
+  },
+};
+
+function capitalize(s) {
+  if (!s) return s;
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
+/* --------------------------------------------------------------
+   OPEN-METEO API
+   --------------------------------------------------------------
+   Free, no API key, CORS-enabled. We fetch:
+     - past 24h hourly: rainfall, temp, humidity, wind, cloud, isDay
+     - next 48h hourly: same
+   We combine into a single hourly array centered on "now".
+   -------------------------------------------------------------- */
+async function fetchWeather(lat, lon) {
+  const params = new URLSearchParams({
+    latitude: lat,
+    longitude: lon,
+    hourly: [
+      'temperature_2m',
+      'relative_humidity_2m',
+      'precipitation',
+      'rain',
+      'cloud_cover',
+      'wind_speed_10m',
+      'is_day',
+      'precipitation_probability',
+    ].join(','),
+    current: ['temperature_2m','relative_humidity_2m','precipitation','rain','wind_speed_10m','cloud_cover','is_day'].join(','),
+    timezone: 'auto',
+    past_days: 1,
+    forecast_days: 2,
+    wind_speed_unit: 'kmh',
+  });
+  const url = `https://api.open-meteo.com/v1/forecast?${params}`;
+  const r = await fetch(url);
+  if (!r.ok) throw new Error(`Open-Meteo HTTP ${r.status}`);
+  return r.json();
+}
+
+/*  Convert Open-Meteo hourly arrays into our canonical hour records.
+    Returns: { history: [past 24h + current], forecast: [next 24h] }   */
+function shapeHourly(raw) {
+  const h = raw.hourly;
+  if (!h || !h.time) return { history: [], forecast: [] };
+  const nowMs = Date.now();
+  const records = h.time.map((t, i) => {
+    const time = new Date(t);
+    return {
+      time,
+      ts: time.getTime(),
+      rain_mm: (h.rain?.[i] ?? h.precipitation?.[i] ?? 0),
+      temp: h.temperature_2m?.[i] ?? 0,
+      humid: h.relative_humidity_2m?.[i] ?? 50,
+      clouds: h.cloud_cover?.[i] ?? 50,
+      wind: h.wind_speed_10m?.[i] ?? 0,
+      isDay: !!h.is_day?.[i],
+      precipProb: h.precipitation_probability?.[i] ?? 0,
+    };
+  });
+
+  // History = up to and including current hour. Forecast = strictly future.
+  // Find the most recent record at or before "now".
+  let nowIdx = -1;
+  for (let i = 0; i < records.length; i++) {
+    if (records[i].ts <= nowMs) nowIdx = i;
+    else break;
+  }
+  if (nowIdx < 0) nowIdx = 0;
+
+  const history = records.slice(Math.max(0, nowIdx - 23), nowIdx + 1);
+  const forecast = records.slice(nowIdx + 1, nowIdx + 1 + 24);
+  return { history, forecast, current: raw.current || null };
+}
+
+/* --------------------------------------------------------------
+   COMMUTE WINDOW EVALUATION
+   --------------------------------------------------------------
+   Project the model into the future. For a window starting H hours
+   from now and lasting D hours, we replay the drying model with
+   forecast data appended. */
+function projectForward(history, forecast, hoursAhead, durationHours = 1) {
+  // Concat history + forecast up to hoursAhead+duration
+  const combined = [...history];
+  for (let i = 0; i < hoursAhead + durationHours && i < forecast.length; i++) {
+    combined.push(forecast[i]);
+  }
+  // Evaluate state at the END of the window
+  const truncated = combined.slice(0, history.length + hoursAhead + durationHours);
+  return DRY_MODEL.evaluate(truncated);
+}
+
+function nextCommuteWindows() {
+  // Heuristic: morning ride 8-9am local, evening ride 6-7pm local
+  const now = new Date();
+  const todayMorning = new Date(now); todayMorning.setHours(8, 30, 0, 0);
+  const todayEvening = new Date(now); todayEvening.setHours(18, 30, 0, 0);
+  const tomorrowMorning = new Date(now); tomorrowMorning.setDate(now.getDate() + 1); tomorrowMorning.setHours(8, 30, 0, 0);
+
+  const candidates = [todayMorning, todayEvening, tomorrowMorning];
+  const future = candidates.filter(d => d.getTime() > now.getTime() + 30 * 60 * 1000);
+  return future.slice(0, 2).map(d => ({
+    label: d.toDateString() === now.toDateString() ? (d.getHours() < 12 ? 'TODAY · MORNING' : 'TODAY · EVENING') : 'TOMORROW · MORNING',
+    time: d,
+    hoursAhead: Math.max(0, Math.round((d.getTime() - now.getTime()) / 3.6e6)),
+  }));
+}
+
+/* --------------------------------------------------------------
+   RENDER
+   -------------------------------------------------------------- */
+let STATE = {
+  locations: [],
+  weatherByLoc: {},   // id -> { history, forecast }
+  log: [],
+};
+
+function bandClass(score) {
+  if (score >= 85) return 'good';
+  if (score >= 65) return 'fair';
+  if (score >= 40) return 'poor';
+  return 'bad';
+}
+
+function fmtTime(d) {
+  return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
+}
+
+function tickClock() {
+  const now = new Date();
+  const c = document.getElementById('clock');
+  const s = document.getElementById('dateStamp');
+  if (c) c.textContent = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
+  if (s) s.textContent = now.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' }).toUpperCase();
+}
+
+async function loadAll() {
+  // Load locations and ride log
+  let locs = await STORE.getLocations();
+  if (!locs) {
+    locs = DEFAULT_LOCATIONS.slice();
+    await STORE.setLocations(locs);
+  }
+  STATE.locations = locs;
+  STATE.log = await STORE.getLog();
+
+  // Fetch weather for each
+  STATE.weatherByLoc = {};
+  await Promise.all(STATE.locations.map(async (loc) => {
+    try {
+      const raw = await fetchWeather(loc.lat, loc.lon);
+      STATE.weatherByLoc[loc.id] = shapeHourly(raw);
+    } catch (e) {
+      console.error('weather fetch failed', loc, e);
+      STATE.weatherByLoc[loc.id] = { history: [], forecast: [], error: e.message };
+    }
+  }));
+
+  render();
+}
+
+function render() {
+  const root = document.getElementById('root');
+  if (!STATE.locations.length) {
+    root.innerHTML = '<div class="loading">No locations yet</div>';
+    return;
+  }
+
+  const primary = STATE.locations.find(l => l.role === 'primary') || STATE.locations[0];
+  const primaryWx = STATE.weatherByLoc[primary.id];
+
+  if (!primaryWx || !primaryWx.history.length) {
+    root.innerHTML = `<div class="error">Could not fetch weather for ${primary.name}. ${primaryWx?.error || ''}</div>` + renderLocations();
+    return;
+  }
+
+  const primaryState = DRY_MODEL.evaluate(primaryWx.history);
+  const primaryScore = DRY_MODEL.score(primaryState, primaryWx.forecast);
+
+  // Update logo dot color to match primary verdict
+  const logoDot = document.getElementById('logoDot');
+  if (logoDot) {
+    const colorMap = { good: 'var(--moss)', fair: 'var(--sodium)', poor: 'var(--rust)', bad: 'var(--oxide)' };
+    logoDot.style.background = colorMap[primaryScore.band] || 'var(--paper-3)';
+  }
+
+  root.innerHTML = `
+    ${renderPrimary(primary, primaryState, primaryScore)}
+    ${renderLocations()}
+    ${renderCommute(primary, primaryWx)}
+    ${renderForecast(primary, primaryWx)}
+    ${renderLog()}
+  `;
+
+  attachHandlers();
+}
+
+function renderPrimary(loc, st, sc) {
+  const bandCls = sc.band;
+  const headline = sc.headline.replace(/\.$/, '');
+  const wind = st.currentWind ?? 0;
+  return `
+    <div class="primary">
+      <div class="score-block">
+        <div class="score-label">RIDEABILITY · ${loc.name}</div>
+        <div class="score ${bandCls}">${sc.score}</div>
+        <div class="score-suffix">/ 100</div>
+      </div>
+      <div class="verdict-block">
+        <div class="verdict-headline">${headline}<span class="accent">.</span></div>
+        <div class="verdict-body">${sc.body}</div>
+      </div>
+      <div class="telemetry">
+        <div class="tel-cell">
+          <div class="tel-label">TEMP</div>
+          <div class="tel-value">${st.currentTemp.toFixed(1)}<span class="unit">°C</span></div>
+        </div>
+        <div class="tel-cell">
+          <div class="tel-label">WIND</div>
+          <div class="tel-value">${wind.toFixed(0)}<span class="unit">KPH</span></div>
+        </div>
+        <div class="tel-cell">
+          <div class="tel-label">HUMID</div>
+          <div class="tel-value">${st.currentHumid.toFixed(0)}<span class="unit">%</span></div>
+        </div>
+        <div class="tel-cell">
+          <div class="tel-label">CLOUD</div>
+          <div class="tel-value">${st.currentClouds.toFixed(0)}<span class="unit">%</span></div>
+        </div>
+        <div class="tel-cell">
+          <div class="tel-label">SURFACE</div>
+          <div class="tel-value">${st.rainNow ? 'WET·RAIN' : st.wet ? 'DAMP' : st.paintWet ? 'PAINT WET' : 'DRY'}</div>
+        </div>
+        <div class="tel-cell">
+          <div class="tel-label">SINCE RAIN</div>
+          <div class="tel-value">${st.hoursSinceRainEnded == null ? '—' : st.hoursSinceRainEnded + 'H'}</div>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function renderLocations() {
+  const cards = STATE.locations.map(loc => {
+    const wx = STATE.weatherByLoc[loc.id];
+    if (!wx || !wx.history.length) {
+      return `<div class="loc-card" data-loc="${loc.id}">
+        <div class="strip"></div>
+        <div class="loc-head"><div class="loc-name">${escape(loc.name)}</div></div>
+        <div class="loc-line">no data</div>
+      </div>`;
+    }
+    const st = DRY_MODEL.evaluate(wx.history);
+    const sc = DRY_MODEL.score(st, wx.forecast);
+    const cls = sc.band;
+    const isPrimary = loc.role === 'primary';
+    return `
+      <div class="loc-card ${cls} ${isPrimary ? 'primary-loc' : ''}" data-loc="${loc.id}">
+        <div class="strip"></div>
+        <div class="loc-head">
+          <div class="loc-name">${escape(loc.name)}${isPrimary ? ' ★' : ''}</div>
+          <div class="loc-score ${cls}">${sc.score}</div>
+        </div>
+        <div class="loc-line"><span class="lbl">TEMP</span>${st.currentTemp.toFixed(1)}°C  <span class="lbl" style="margin-left:10px">WIND</span>${st.currentWind.toFixed(0)} kph</div>
+        <div class="loc-line"><span class="lbl">SURF</span>${st.rainNow ? 'wet (raining)' : st.wet ? 'damp' : st.paintWet ? 'paint wet' : 'dry'}${st.puddleLikely ? ' · puddles' : ''}</div>
+        <div class="loc-verdict">${sc.headline} ${sc.body.split('.')[0]}.</div>
+        <div class="loc-actions">
+          <button data-edit="${loc.id}">EDIT</button>
+          <button data-make-primary="${loc.id}">★ PRIMARY</button>
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  return `
+    <div class="section-head">
+      <div class="section-title">LOCATIONS</div>
+      <div class="section-sub">click EDIT on hover · ★ sets primary</div>
+    </div>
+    <div class="locations">
+      ${cards}
+      <button class="add-loc" id="addLocBtn">+ ADD LOCATION</button>
+    </div>
+  `;
+}
+
+function renderCommute(primaryLoc, wx) {
+  const windows = nextCommuteWindows();
+  if (!windows.length) return '';
+  const cards = windows.map(w => {
+    const projected = projectForward(wx.history, wx.forecast, w.hoursAhead, 1);
+    if (!projected) return '';
+    // For commute scoring, treat projected forecast slice as the "next 3h"
+    const fcSlice = wx.forecast.slice(w.hoursAhead, w.hoursAhead + 3);
+    const sc = DRY_MODEL.score(projected, fcSlice);
+    return `
+      <div class="commute-card">
+        <div class="commute-time">${w.label}</div>
+        <div class="commute-window">~${fmtTime(w.time)}</div>
+        <div class="commute-verdict">
+          <span class="commute-score ${sc.band}">${sc.score}</span>
+          <strong>${sc.headline}</strong>
+          ${sc.body}
+        </div>
+      </div>
+    `;
+  }).join('');
+  return `
+    <div class="section-head">
+      <div class="section-title">COMMUTE WINDOWS</div>
+      <div class="section-sub">primary: ${primaryLoc.name}</div>
+    </div>
+    <div class="commute">${cards}</div>
+  `;
+}
+
+function renderForecast(primaryLoc, wx) {
+  // Show current + next 18 hours
+  const all = [...wx.history.slice(-1), ...wx.forecast.slice(0, 17)];
+  const maxRain = Math.max(2, ...all.map(h => h.rain_mm || 0));
+  const cells = all.map((h, idx) => {
+    const ratio = Math.min(1, (h.rain_mm || 0) / maxRain);
+    const heightPct = Math.max(2, ratio * 100);
+    const isNow = idx === 0;
+    return `
+      <div class="fhour ${isNow ? 'now' : ''}">
+        <div class="fhour-time">${fmtTime(h.time)}</div>
+        <div class="fhour-bar"><div class="fhour-bar-fill" style="height:${heightPct}%; opacity:${ratio > 0.02 ? 1 : 0}"></div></div>
+        <div class="fhour-temp">${h.temp.toFixed(0)}°</div>
+        <div class="fhour-precip">${h.rain_mm ? h.rain_mm.toFixed(1)+'mm' : '—'}</div>
+      </div>
+    `;
+  }).join('');
+  return `
+    <div class="forecast-wrap">
+      <div class="section-head">
+        <div class="section-title">18-HOUR FORECAST</div>
+        <div class="section-sub">${primaryLoc.name} · bars = rainfall, max ${maxRain.toFixed(1)}mm</div>
+      </div>
+      <div class="forecast">${cells}</div>
+    </div>
+  `;
+}
+
+function renderLog() {
+  const opts = STATE.locations.map(l => `<option value="${l.id}">${escape(l.name)}</option>`).join('');
+  const rows = STATE.log.length === 0
+    ? '<div class="log-empty">No rides logged yet. Log a ride to track conditions over time.</div>'
+    : STATE.log.map((entry, i) => {
+        const d = new Date(entry.ts);
+        const dStr = d.toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+        const cls = bandClass(entry.score);
+        return `
+          <div class="log-row">
+            <div class="when">${dStr}</div>
+            <div class="what">${escape(entry.note || entry.locName || 'ride')}</div>
+            <div class="score-mini ${cls}">${entry.score}</div>
+            <div><button data-rmlog="${i}">×</button></div>
+          </div>
+        `;
+      }).join('');
+
+  return `
+    <div class="log-wrap">
+      <div class="section-head">
+        <div class="section-title">RIDE LOG</div>
+        <div class="section-sub">log a ride to capture conditions snapshot</div>
+      </div>
+      <div class="log-list">${rows}</div>
+      <div class="log-add">
+        <select id="logLoc">${opts}</select>
+        <input id="logNote" placeholder="optional note (route, etc)" />
+        <button class="btn primary" id="logBtn">LOG RIDE NOW</button>
+      </div>
+    </div>
+  `;
+}
+
+function escape(s) {
+  return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+/* --------------------------------------------------------------
+   EVENT HANDLERS
+   -------------------------------------------------------------- */
+function attachHandlers() {
+  document.getElementById('addLocBtn')?.addEventListener('click', () => openLocModal(null));
+
+  document.querySelectorAll('[data-edit]').forEach(b => {
+    b.addEventListener('click', e => {
+      e.stopPropagation();
+      const id = b.dataset.edit;
+      const loc = STATE.locations.find(l => l.id === id);
+      openLocModal(loc);
+    });
+  });
+
+  document.querySelectorAll('[data-make-primary]').forEach(b => {
+    b.addEventListener('click', async e => {
+      e.stopPropagation();
+      const id = b.dataset.makePrimary;
+      STATE.locations.forEach(l => l.role = (l.id === id ? 'primary' : 'secondary'));
+      await STORE.setLocations(STATE.locations);
+      render();
+    });
+  });
+
+  document.getElementById('logBtn')?.addEventListener('click', async () => {
+    const locId = document.getElementById('logLoc').value;
+    const note = document.getElementById('logNote').value.trim();
+    const loc = STATE.locations.find(l => l.id === locId);
+    if (!loc) return;
+    const wx = STATE.weatherByLoc[locId];
+    if (!wx || !wx.history.length) return;
+    const st = DRY_MODEL.evaluate(wx.history);
+    const sc = DRY_MODEL.score(st, wx.forecast);
+    const entry = {
+      ts: Date.now(),
+      locId, locName: loc.name,
+      note, score: sc.score,
+      band: sc.band,
+      conditions: { temp: st.currentTemp, wind: st.currentWind, humid: st.currentHumid, rainNow: st.rainNow, wet: st.wet }
+    };
+    STATE.log.unshift(entry);
+    await STORE.setLog(STATE.log);
+    render();
+  });
+
+  document.querySelectorAll('[data-rmlog]').forEach(b => {
+    b.addEventListener('click', async () => {
+      const i = parseInt(b.dataset.rmlog);
+      STATE.log.splice(i, 1);
+      await STORE.setLog(STATE.log);
+      render();
+    });
+  });
+}
+
+/* --------------------------------------------------------------
+   LOCATION MODAL
+   -------------------------------------------------------------- */
+let editingLocId = null;
+
+function openLocModal(loc) {
+  editingLocId = loc?.id || null;
+  document.getElementById('modalTitle').textContent = loc ? 'EDIT LOCATION' : 'ADD LOCATION';
+  document.getElementById('locId').value = loc?.id || '';
+  document.getElementById('locName').value = loc?.name || '';
+  document.getElementById('locLat').value = loc?.lat ?? '';
+  document.getElementById('locLon').value = loc?.lon ?? '';
+  document.getElementById('locRole').value = loc?.role || 'secondary';
+  document.getElementById('modalDelete').style.display = loc ? 'inline-block' : 'none';
+  document.getElementById('locModal').classList.add('show');
+}
+
+function closeLocModal() {
+  document.getElementById('locModal').classList.remove('show');
+  editingLocId = null;
+}
+
+document.getElementById('modalCancel').addEventListener('click', closeLocModal);
+document.getElementById('locModal').addEventListener('click', e => {
+  if (e.target.id === 'locModal') closeLocModal();
+});
+
+document.getElementById('useGeo').addEventListener('click', () => {
+  if (!navigator.geolocation) { alert('Geolocation not available'); return; }
+  navigator.geolocation.getCurrentPosition(p => {
+    document.getElementById('locLat').value = p.coords.latitude.toFixed(4);
+    document.getElementById('locLon').value = p.coords.longitude.toFixed(4);
+  }, err => alert('Geolocation failed: ' + err.message));
+});
+
+document.getElementById('modalSave').addEventListener('click', async () => {
+  const name = document.getElementById('locName').value.trim().toUpperCase();
+  const lat = parseFloat(document.getElementById('locLat').value);
+  const lon = parseFloat(document.getElementById('locLon').value);
+  const role = document.getElementById('locRole').value;
+  if (!name || isNaN(lat) || isNaN(lon)) { alert('Please fill all fields'); return; }
+
+  if (editingLocId) {
+    const loc = STATE.locations.find(l => l.id === editingLocId);
+    Object.assign(loc, { name, lat, lon, role });
+  } else {
+    STATE.locations.push({
+      id: 'loc_' + Date.now().toString(36),
+      name, lat, lon, role,
+    });
+  }
+
+  // If new role is primary, demote others
+  if (role === 'primary') {
+    STATE.locations.forEach(l => {
+      if (l.id !== editingLocId && l.name !== name) l.role = 'secondary';
+    });
+    // De-duplicate primaries
+    let foundPrimary = false;
+    STATE.locations.forEach(l => {
+      if (l.role === 'primary') {
+        if (foundPrimary) l.role = 'secondary';
+        else foundPrimary = true;
+      }
+    });
+  }
+
+  await STORE.setLocations(STATE.locations);
+  closeLocModal();
+  await loadAll();
+});
+
+document.getElementById('modalDelete').addEventListener('click', async () => {
+  if (!editingLocId) return;
+  if (!confirm('Delete this location?')) return;
+  STATE.locations = STATE.locations.filter(l => l.id !== editingLocId);
+  // Ensure at least one primary
+  if (STATE.locations.length && !STATE.locations.find(l => l.role === 'primary')) {
+    STATE.locations[0].role = 'primary';
+  }
+  await STORE.setLocations(STATE.locations);
+  closeLocModal();
+  await loadAll();
+});
+
+/* --------------------------------------------------------------
+   BOOT
+   -------------------------------------------------------------- */
+tickClock();
+setInterval(tickClock, 30 * 1000);
+loadAll();
+
+// Refresh weather every 10 min
+setInterval(loadAll, 10 * 60 * 1000);
+</script>
+</body>
+</html>
