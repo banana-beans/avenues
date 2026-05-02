@@ -22,8 +22,8 @@ import { renderDataPanel } from '@/ui/DataPanel.ts';
 import { renderForecastStrip } from '@/ui/ForecastStrip.ts';
 import { renderModeToggle } from '@/ui/ModeToggle.ts';
 import { renderRideLog } from '@/ui/RideLog.ts';
-import { renderBikeLegs } from '@/ui/SegmentCards.ts';
-import { DEFAULT_BIKE_LEGS } from '@/storage/segments.ts';
+import { renderLegs } from '@/ui/SegmentCards.ts';
+import { DEFAULT_LEGS } from '@/storage/segments.ts';
 import type { Mode } from '@/storage/types.ts';
 import {
   closeLocationModal,
@@ -31,7 +31,7 @@ import {
   openLocationModal,
   readLocationForm,
 } from '@/ui/LocationModal.ts';
-import { fmtShortDate, fmtTime } from '@/ui/format.ts';
+import { escapeHtml, fmtShortDate, fmtTime } from '@/ui/format.ts';
 
 import './ui/styles.css';
 
@@ -136,7 +136,12 @@ function render(): void {
       mode: state.mode,
       ...(apparentTempC != null ? { apparentTempC } : {}),
     });
-    return { location: loc, state: evalState, score: scored };
+    return {
+      location: loc,
+      state: evalState,
+      score: scored,
+      ...(apparentTempC != null ? { apparentTempC } : {}),
+    };
   });
 
   const primaryCard = cards.find((c) => c.location.id === primary.id);
@@ -155,14 +160,14 @@ function render(): void {
   ) {
     const errMessage = primarySlot?.error ?? 'no weather data';
     root.innerHTML = `
-      <div class="error">Could not fetch weather for ${escape(primary.name)}. ${escape(errMessage)}</div>
-      ${renderLocations(cards)}
+      <div class="error">Could not fetch weather for ${escapeHtml(primary.name)}. ${escapeHtml(errMessage)}</div>
+      ${renderLocations(cards, { mode: state.mode })}
     `;
     return;
   }
 
   const apparentTempC = currentApparentTemp(primaryWeather);
-  const legsHtml = state.mode === 'bike' ? renderBikeLegs(DEFAULT_BIKE_LEGS, cards) : '';
+  const legsHtml = renderLegs(state.mode, DEFAULT_LEGS, cards);
   root.innerHTML = `
     ${renderModeToggle(state.mode)}
     ${renderPrimary(primary, primaryCard.state, primaryCard.score, {
@@ -171,9 +176,9 @@ function render(): void {
     })}
     ${renderLocations(cards)}
     ${legsHtml}
-    ${renderCommuteWindows(primary, primaryWeather.history, primaryWeather.forecast)}
+    ${renderCommuteWindows(primary, primaryWeather.history, primaryWeather.forecast, { mode: state.mode })}
     ${renderForecastStrip(primary, primaryWeather.history, primaryWeather.forecast)}
-    ${renderRideLog(state.log, state.locations)}
+    ${renderRideLog(state.log, state.locations, { mode: state.mode })}
     ${renderDataPanel()}
   `;
 }
@@ -194,25 +199,6 @@ function bandToCssVar(band: ScoreBand): string {
     case 'bad':
       return 'var(--oxide)';
   }
-}
-
-function escape(s: string): string {
-  return s.replace(/[&<>"']/g, (c) => {
-    switch (c) {
-      case '&':
-        return '&amp;';
-      case '<':
-        return '&lt;';
-      case '>':
-        return '&gt;';
-      case '"':
-        return '&quot;';
-      case "'":
-        return '&#39;';
-      default:
-        return c;
-    }
-  });
 }
 
 // ---------------------------------------------------------------------------

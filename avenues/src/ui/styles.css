@@ -695,7 +695,38 @@ header {
 }
 .log-row:last-child { border-bottom: none; }
 .log-row .when { color: var(--paper-3); font-variant-numeric: tabular-nums; }
-.log-row .what { color: var(--paper); }
+.log-row .what {
+  color: var(--paper);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.log-row .what > span:not(.log-mode) {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.log-mode {
+  display: inline-block;
+  font-family: 'Archivo Narrow', 'Helvetica Neue', sans-serif;
+  font-weight: 600;
+  font-size: 9px;
+  letter-spacing: 0.18em;
+  padding: 2px 6px;
+  border: 1px solid var(--asphalt-3);
+  color: var(--paper-3);
+  flex-shrink: 0;
+  border-radius: 2px;
+}
+.log-mode-bike {
+  border-color: var(--asphalt-3);
+  color: var(--paper-3);
+}
+.log-mode-run {
+  border-color: var(--sodium);
+  color: var(--sodium);
+}
 .log-row .score-mini {
   font-family: 'Archivo Narrow', 'Helvetica Neue', sans-serif;
   font-weight: 700;
