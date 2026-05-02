@@ -840,6 +840,113 @@ header {
 }
 
 /* ============================================================
+   RUN TRACKER
+   ============================================================ */
+.run-card {
+  border: 1px solid var(--asphalt-3);
+  background: var(--asphalt-1);
+  padding: 24px;
+  margin-bottom: 48px;
+}
+.run-card.run-active {
+  border-color: var(--sodium);
+  background: linear-gradient(180deg, rgba(232, 179, 57, 0.04), transparent 60%), var(--asphalt-1);
+}
+.run-explainer {
+  font-family: 'Instrument Serif', Georgia, serif;
+  font-style: italic;
+  color: var(--paper-2);
+  font-size: 15px;
+  line-height: 1.55;
+  margin-bottom: 24px;
+}
+.run-error {
+  border: 1px solid var(--oxide);
+  color: var(--oxide);
+  padding: 10px 12px;
+  margin-bottom: 16px;
+  font-size: 12px;
+}
+.run-stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1px;
+  background: var(--asphalt-3);
+  border: 1px solid var(--asphalt-3);
+  margin-bottom: 20px;
+}
+.run-stat {
+  background: var(--asphalt-1);
+  padding: 16px 12px;
+  text-align: center;
+}
+.run-stat-label {
+  font-family: 'Archivo Narrow', 'Helvetica Neue', sans-serif;
+  font-weight: 600;
+  font-size: 10px;
+  letter-spacing: 0.2em;
+  color: var(--paper-3);
+  margin-bottom: 6px;
+}
+.run-stat-value {
+  font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-weight: 500;
+  font-size: 28px;
+  color: var(--paper);
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+.run-splits {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 20px 0;
+  border: 1px solid var(--asphalt-3);
+  max-height: 200px;
+  overflow-y: auto;
+}
+.run-splits li {
+  display: flex;
+  justify-content: space-between;
+  padding: 8px 14px;
+  border-bottom: 1px solid var(--asphalt-3);
+  font-size: 12px;
+}
+.run-splits li:last-child { border-bottom: none; }
+.run-split-mi {
+  font-family: 'Archivo Narrow', 'Helvetica Neue', sans-serif;
+  font-weight: 600;
+  letter-spacing: 0.18em;
+  color: var(--paper-3);
+}
+.run-split-time {
+  font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  color: var(--paper);
+  font-variant-numeric: tabular-nums;
+}
+.run-splits-empty {
+  padding: 14px;
+  text-align: center;
+  color: var(--paper-3);
+  font-family: 'Instrument Serif', Georgia, serif;
+  font-style: italic;
+  font-size: 13px;
+  border: 1px dashed var(--asphalt-3);
+  margin-bottom: 20px;
+}
+.run-big-btn {
+  display: block;
+  width: 100%;
+  font-size: 14px;
+  letter-spacing: 0.25em;
+  padding: 16px 20px;
+}
+.run-done-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
+/* ============================================================
    RESPONSIVE
    ============================================================ */
 @media (max-width: 768px) {

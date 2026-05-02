@@ -22,9 +22,15 @@ import { renderDataPanel } from '@/ui/DataPanel.ts';
 import { renderForecastStrip } from '@/ui/ForecastStrip.ts';
 import { renderModeToggle } from '@/ui/ModeToggle.ts';
 import { renderRideLog } from '@/ui/RideLog.ts';
+import {
+  mountRunTracker,
+  renderRunTracker,
+  tearDownRunTracker,
+  type RunSummary,
+} from '@/ui/RunTracker.ts';
 import { renderLegs } from '@/ui/SegmentCards.ts';
 import { DEFAULT_LEGS } from '@/storage/segments.ts';
-import type { Mode } from '@/storage/types.ts';
+import type { LoggedRun, Mode } from '@/storage/types.ts';
 import {
   closeLocationModal,
   getEditingLocationId,
@@ -167,20 +173,43 @@ function render(): void {
   }
 
   const apparentTempC = currentApparentTemp(primaryWeather);
-  const legsHtml = renderLegs(state.mode, DEFAULT_LEGS, cards);
+  const isBike = state.mode === 'bike';
+  const isRun = state.mode === 'run';
+
+  // Bike-only sections — hidden in run mode where the runner only cares about
+  // their current location + the live tracker.
+  const locationsHtml = isBike ? renderLocations(cards, { mode: state.mode }) : '';
+  const legsHtml = isBike ? renderLegs(state.mode, DEFAULT_LEGS, cards) : '';
+  const commuteHtml = isBike
+    ? renderCommuteWindows(primary, primaryWeather.history, primaryWeather.forecast, {
+        mode: state.mode,
+      })
+    : '';
+
+  // Run-only — the live tracker (idle / active / done state).
+  const trackerHtml = isRun ? renderRunTracker() : '';
+
   root.innerHTML = `
     ${renderModeToggle(state.mode)}
     ${renderPrimary(primary, primaryCard.state, primaryCard.score, {
       mode: state.mode,
       ...(apparentTempC != null ? { apparentTempC } : {}),
     })}
-    ${renderLocations(cards)}
+    ${trackerHtml}
+    ${locationsHtml}
     ${legsHtml}
-    ${renderCommuteWindows(primary, primaryWeather.history, primaryWeather.forecast, { mode: state.mode })}
+    ${commuteHtml}
     ${renderForecastStrip(primary, primaryWeather.history, primaryWeather.forecast)}
     ${renderRideLog(state.log, state.locations, { mode: state.mode })}
     ${renderDataPanel()}
   `;
+
+  if (isRun) {
+    mountRunTracker({
+      onSaveRun: handleSaveRun,
+      requestRefresh: render,
+    });
+  }
 }
 
 function currentApparentTemp(weather: ShapedWeather): number | undefined {
@@ -273,6 +302,9 @@ function setupEventDelegation(): void {
         const m = actionEl.dataset.mode;
         if (m !== 'bike' && m !== 'run') break;
         if (state.mode === m) break;
+        // Leaving run mode: stop the live tracker (keeps the snapshot so the
+        // user can save it on return). Doesn't auto-discard.
+        if (state.mode === 'run' && m === 'bike') tearDownRunTracker();
         state.mode = m;
         await persistence.setMode(m);
         render();
@@ -360,6 +392,62 @@ async function handleLogRide(): Promise<void> {
   state.log = [entry, ...state.log];
   await persistence.setLog(state.log);
   noteInput.value = '';
+  render();
+}
+
+/**
+ * Persist a tracker-recorded run as a log entry. Uses the primary location
+ * for current weather/score snapshot — the tracker doesn't ask which location
+ * the run started from (that'd be friction; the runner's GPS is already known
+ * by the tracker, the primary is the closest sensible attribution).
+ */
+async function handleSaveRun(summary: RunSummary): Promise<void> {
+  const primary =
+    state.locations.find((l) => l.role === 'primary') ?? state.locations[0];
+  if (!primary) return;
+
+  const slot = state.weatherByLoc.get(primary.id);
+  if (!slot?.weather || slot.weather.history.length === 0) return;
+
+  const evalState = evaluate(slot.weather.history);
+  if (!evalState) return;
+
+  const apparentTempC = currentApparentTemp(slot.weather);
+  const scored = score(evalState, slot.weather.forecast, {
+    mode: 'run',
+    ...(apparentTempC != null ? { apparentTempC } : {}),
+  });
+
+  const loggedRun: LoggedRun = {
+    distance_m: summary.distance_m,
+    duration_ms: summary.duration_ms,
+    splits: summary.splits.map((s) => ({
+      mile: s.mile,
+      splitMs: s.splitMs,
+      totalMs: s.totalMs,
+    })),
+  };
+
+  const entry: RideLogEntry = {
+    ts: Date.now(),
+    locId: primary.id,
+    locName: primary.name,
+    note: '',
+    score: scored.score,
+    band: scored.band,
+    mode: 'run',
+    conditions: {
+      temp: evalState.currentTemp,
+      wind: evalState.currentWind,
+      humid: evalState.currentHumid,
+      rainNow: evalState.rainNow,
+      wet: evalState.wet,
+    },
+    run: loggedRun,
+  };
+
+  state.log = [entry, ...state.log];
+  await persistence.setLog(state.log);
   render();
 }
 

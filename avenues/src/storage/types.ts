@@ -31,6 +31,20 @@ export interface RideConditions {
 
 export type ScoreBand = 'good' | 'fair' | 'poor' | 'bad';
 
+/** Per-mile split captured during a tracked run. */
+export interface LoggedSplit {
+  readonly mile: number;
+  readonly splitMs: number;
+  readonly totalMs: number;
+}
+
+/** Optional tracking summary attached to entries created from a tracked run. */
+export interface LoggedRun {
+  readonly distance_m: number;
+  readonly duration_ms: number;
+  readonly splits: readonly LoggedSplit[];
+}
+
 export interface RideLogEntry {
   /** Unix ms timestamp the ride was logged. */
   readonly ts: number;
@@ -43,4 +57,6 @@ export interface RideLogEntry {
   readonly conditions: RideConditions;
   /** Activity mode at the time of logging. Older entries default to 'bike'. */
   readonly mode?: Mode;
+  /** Present when the entry was saved from the in-app run tracker. */
+  readonly run?: LoggedRun;
 }

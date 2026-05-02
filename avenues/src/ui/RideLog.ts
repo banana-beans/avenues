@@ -1,3 +1,4 @@
+import { fmtClock, fmtMiles } from '@/run/format.ts';
 import type { Location, Mode, RideLogEntry } from '@/storage/types.ts';
 
 import { bandFromScore, escapeHtml, fmtLogStamp } from './format.ts';
@@ -27,7 +28,11 @@ export function renderRideLog(
           .map((entry, i) => {
             const stamp = fmtLogStamp(new Date(entry.ts));
             const band = entry.band ?? bandFromScore(entry.score);
-            const what = entry.note?.trim() || entry.locName || 'entry';
+            // Tracker-recorded runs have summary text built from distance/time;
+            // otherwise fall back to the user's note or the location label.
+            const what = entry.run
+              ? `${fmtMiles(entry.run.distance_m)} · ${fmtClock(entry.run.duration_ms)}${entry.note ? ` · ${entry.note}` : ''}`
+              : entry.note?.trim() || entry.locName || 'entry';
             // Older entries lack `mode` — default tag to 'bike' (matches Mode default).
             const mode: Mode = entry.mode ?? 'bike';
             return `
@@ -35,7 +40,7 @@ export function renderRideLog(
                 <div class="when">${escapeHtml(stamp)}</div>
                 <div class="what">
                   <span class="log-mode log-mode-${mode}">${mode === 'run' ? 'RUN' : 'BIKE'}</span>
-                  ${escapeHtml(what)}
+                  <span>${escapeHtml(what)}</span>
                 </div>
                 <div class="score-mini ${band}">${entry.score}</div>
                 <div><button data-action="remove-log" data-index="${i}" aria-label="Remove">×</button></div>
